@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3ecdc">
+  <title>眼跳时辰 · 日晷</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3ecdc;
+      --paper-light: #fffdf7;
+      --ink: #202923;
+      --ink-soft: #667068;
+      --line: rgba(38, 52, 43, 0.13);
+      --jade: #2f6b52;
+      --jade-dark: #1f4e3b;
+      --vermilion: #a94135;
+      --good: #168454;
+      --good-soft: #e7f5ec;
+      --bad: #b33b32;
+      --bad-soft: #faebe8;
+      --gold: #b38a45;
+      --shadow: 0 24px 70px rgba(48, 44, 34, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-height: 100%; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(255, 255, 255, 0.9), transparent 34rem),
+        radial-gradient(circle at 90% 18%, rgba(182, 151, 92, 0.1), transparent 30rem),
+        linear-gradient(155deg, #f8f3e7 0%, var(--paper) 58%, #ece2cf 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.28;
+      background-image:
+        repeating-linear-gradient(87deg, rgba(70, 58, 40, 0.025) 0 1px, transparent 1px 7px),
+        repeating-linear-gradient(3deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 9px);
+      mix-blend-mode: multiply;
+    }
+
+    button { font: inherit; }
+
+    .page {
+      position: relative;
+      width: min(100% - 28px, 760px);
+      margin: 0 auto;
+      padding: 36px 0 30px;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 0 4px 20px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--vermilion);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.24em;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "STKaiti", "KaiTi", "FangSong", serif;
+      font-size: clamp(33px, 7vw, 52px);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      line-height: 1;
+    }
+
+    .seal {
+      display: grid;
+      width: 53px;
+      height: 53px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 2px solid rgba(169, 65, 53, 0.75);
+      color: var(--vermilion);
+      font-family: "STKaiti", "KaiTi", serif;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.15;
+      text-align: center;
+      transform: rotate(1.5deg);
+    }
+
+    .dial-card,
+    .choice-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(76, 69, 54, 0.13);
+      border-radius: 28px;
+      background: rgba(255, 253, 247, 0.76);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .dial-card {
+      padding: 18px 22px 26px;
+    }
+
+    .dial-card::after {
+      content: "";
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      top: -120px;
+      right: -80px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(179, 138, 69, 0.16), transparent 69%);
+      pointer-events: none;
+    }
+
+    .live-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 0 5px rgba(22, 132, 84, 0.1);
+      animation: breathe 2.2s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      50% { box-shadow: 0 0 0 8px rgba(22, 132, 84, 0.03); }
+    }
+
+    .dial-wrap {
+      position: relative;
+      width: min(100%, 452px);
+      margin: 2px auto -4px;
+    }
+
+    .dial-wrap svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .dial-label {
+      fill: #566259;
+      font-family: "STKaiti", "KaiTi", serif;
+      font-size: 20px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: central;
+      transition: fill 180ms ease, font-size 180ms ease;
+    }
+
+    .dial-label.active {
+      fill: var(--vermilion);
+      font-size: 24px;
+    }
+
+    .current-arc {
+      transition: transform 350ms ease;
+    }
+
+    .time-block {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+    }
+
+    .digital-time {
+      font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      font-size: clamp(36px, 9vw, 60px);
+      font-weight: 660;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.055em;
+      line-height: 1;
+    }
+
+    .date-text {
+      min-height: 20px;
+      margin-top: 9px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      letter-spacing: 0.06em;
+    }
+
+    .shichen-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+      padding: 9px 14px 9px 10px;
+      border: 1px solid rgba(47, 107, 82, 0.18);
+      border-radius: 999px;
+      background: rgba(231, 245, 236, 0.62);
+      color: var(--jade-dark);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .shichen-name {
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--jade);
+      color: white;
+      font-family: "STKaiti", "KaiTi", serif;
+      font-size: 16px;
+      letter-spacing: 0.08em;
+    }
+
+    .choice-card {
+      margin-top: 18px;
+      padding: 26px;
+    }
+
+    .choice-heading {
+      margin: 0;
+      font-family: "STKaiti", "KaiTi", serif;
+      font-size: 25px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .choice-subtitle {
+      margin: 7px 0 20px;
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+
+    .eye-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 13px;
+    }
+
+    .eye-button {
+      position: relative;
+      display: flex;
+      min-height: 92px;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      border: 1px solid rgba(47, 107, 82, 0.22);
+      border-radius: 20px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.58);
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+    }
+
+    .eye-button:hover {
+      transform: translateY(-2px);
+      border-color: rgba(47, 107, 82, 0.48);
+      background: white;
+      box-shadow: 0 13px 28px rgba(47, 72, 57, 0.09);
+    }
+
+    .eye-button:active { transform: translateY(0); }
+
+    .eye-button:focus-visible {
+      outline: 3px solid rgba(47, 107, 82, 0.25);
+      outline-offset: 3px;
+    }
+
+    .eye-icon {
+      width: 46px;
+      color: var(--jade);
+    }
+
+    .eye-button strong {
+      display: block;
+      font-family: "STKaiti", "KaiTi", serif;
+      font-size: 22px;
+      line-height: 1.1;
+    }
+
+    .eye-button small {
+      display: block;
+      margin-top: 5px;
+      color: var(--ink-soft);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+    }
+
+    .rule-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin: 18px 2px 0;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .rule-note::before {
+      content: "则";
+      display: grid;
+      width: 22px;
+      height: 22px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 1px solid rgba(169, 65, 53, 0.36);
+      color: var(--vermilion);
+      font-family: "STKaiti", "KaiTi", serif;
+      font-size: 12px;
+    }
+
+    footer {
+      margin-top: 18px;
+      color: #7b817c;
+      font-size: 11px;
+      line-height: 1.7;
+      text-align: center;
+    }
+
+    .modal {
+      position: fixed;
+      z-index: 9999;
+      inset: 0;
+      display: grid;
+      isolation: isolate;
+      place-items: center;
+      padding: 20px;
+      background: rgba(23, 30, 25, 0.34);
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+
+    .modal[hidden] { display: none; }
+    .modal.open { opacity: 1; }
+
+    .result-panel {
+      position: relative;
+      z-index: 1;
+      isolation: isolate;
+      width: min(100%, 470px);
+      padding: 26px;
+      border: 1px solid rgba(255, 255, 255, 0.56);
+      border-radius: 28px;
+      background: #fffdf7;
+      box-shadow: 0 30px 100px rgba(18, 25, 20, 0.32);
+      transform: translateY(12px) scale(0.985);
+      transition: transform 180ms ease;
+    }
+
+    .modal.open .result-panel { transform: translateY(0) scale(1); }
+
+    .result-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .result-meta {
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+    }
+
+    .close-button {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: var(--ink-soft);
+      background: transparent;
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease;
+    }
+
+    .close-button:hover { color: var(--ink); background: rgba(32, 41, 35, 0.06); }
+
+    .fortune-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 24px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .fortune-label.good { color: var(--good); background: var(--good-soft); }
+    .fortune-label.bad { color: var(--bad); background: var(--bad-soft); }
+
+    .fortune-label::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .result-text {
+      margin: 15px 0 0;
+      font-family: "STKaiti", "KaiTi", "FangSong", serif;
+      font-size: clamp(34px, 8vw, 48px);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.24;
+    }
+
+    .result-text.good { color: var(--good); }
+    .result-text.bad { color: var(--bad); }
+
+    .result-explain {
+      margin: 11px 0 0;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .remedy {
+      margin-top: 22px;
+      padding: 17px 18px;
+      border: 1px solid rgba(179, 59, 50, 0.14);
+      border-radius: 17px;
+      background: var(--bad-soft);
+      color: #7d312b;
+    }
+
+    .remedy-title {
+      margin: 0 0 7px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+    }
+
+    .remedy p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.72;
+    }
+
+    .modal-open { overflow: hidden; }
+
+    @media (max-width: 560px) {
+      .page { width: min(100% - 20px, 760px); padding-top: 24px; }
+      .masthead { margin-inline: 7px; }
+      .seal { width: 46px; height: 46px; font-size: 14px; }
+      .dial-card { padding: 15px 12px 22px; border-radius: 24px; }
+      .dial-wrap { width: min(100%, 390px); }
+      .choice-card { padding: 22px 16px; border-radius: 24px; }
+      .eye-buttons { gap: 9px; }
+      .eye-button { min-height: 86px; gap: 10px; }
+      .eye-icon { width: 38px; }
+      .eye-button strong { font-size: 20px; }
+      .result-panel { padding: 22px; border-radius: 24px; }
+    }
+
+    @media (max-width: 380px) {
+      .eye-button { flex-direction: column; gap: 6px; }
+      .eye-button small { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">十二时辰 · 民俗占候</p>
+        <h1>眼跳时辰</h1>
+      </div>
+      <div class="seal" aria-hidden="true">观<br>时</div>
+    </header>
+
+    <section class="dial-card" aria-label="当前时间与时辰">
+      <div class="live-row">
+        <span class="live"><span class="live-dot" aria-hidden="true"></span>本地实时</span>
+        <span>日晷随时而行</span>
+      </div>
+
+      <div class="dial-wrap">
+        <svg viewBox="0 0 420 420" role="img" aria-labelledby="dialTitle dialDesc">
+          <title id="dialTitle">十二时辰日晷</title>
+          <desc id="dialDesc">日晷的阴影随当前本地时间转动，并突出显示当前时辰。</desc>
+          <defs>
+            <radialGradient id="dialFace" cx="42%" cy="35%" r="70%">
+              <stop offset="0" stop-color="#fffef9"/>
+              <stop offset="0.68" stop-color="#f0e6d2"/>
+              <stop offset="1" stop-color="#d6c39f"/>
+            </radialGradient>
+            <linearGradient id="rimGold" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8d6b38"/>
+              <stop offset="0.45" stop-color="#d7b86f"/>
+              <stop offset="1" stop-color="#77552c"/>
+            </linearGradient>
+            <linearGradient id="gnomonGold" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#765128"/>
+              <stop offset="0.52" stop-color="#d9bb74"/>
+              <stop offset="1" stop-color="#906a37"/>
+            </linearGradient>
+            <linearGradient id="shadowFade" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#26342b" stop-opacity="0.47"/>
+              <stop offset="1" stop-color="#26342b" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="dialDrop" x="-30%" y="-30%" width="160%" height="170%">
+              <feDropShadow dx="0" dy="13" stdDeviation="14" flood-color="#5f5139" flood-opacity="0.2"/>
+            </filter>
+            <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3.5"/>
+            </filter>
+          </defs>
+
+          <circle cx="210" cy="210" r="193" fill="url(#rimGold)" filter="url(#dialDrop)"/>
+          <circle cx="210" cy="210" r="187" fill="url(#dialFace)" stroke="#fff8e7" stroke-width="2"/>
+          <circle cx="210" cy="210" r="171" fill="none" stroke="#897651" stroke-opacity="0.37"/>
+          <circle cx="210" cy="210" r="129" fill="none" stroke="#897651" stroke-opacity="0.2"/>
+          <circle id="currentArc" class="current-arc" cx="210" cy="210" r="178" fill="none" stroke="#a94135" stroke-width="5" stroke-linecap="round" pathLength="360" stroke-dasharray="25 335"/>
+
+          <g id="dialTicks" aria-hidden="true"></g>
+          <g id="dialLabels" aria-hidden="true"></g>
+
+          <g id="sundialShadow" aria-hidden="true">
+            <path d="M201 216 L219 216 L210 47 Z" fill="url(#shadowFade)" filter="url(#softShadow)"/>
+          </g>
+
+          <g aria-hidden="true">
+            <path d="M210 211 L210 96 L248 211 Z" fill="url(#gnomonGold)" stroke="#765128" stroke-width="1.5"/>
+            <path d="M210 96 L217 211" fill="none" stroke="#fff3cb" stroke-opacity="0.65" stroke-width="1.4"/>
+            <ellipse cx="210" cy="214" rx="43" ry="8" fill="#4b3c27" opacity="0.13" filter="url(#softShadow)"/>
+            <circle cx="210" cy="211" r="8" fill="#7b592f"/>
+            <circle cx="208" cy="208" r="3" fill="#e2c67d"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="time-block" aria-live="polite">
+        <div id="digitalTime" class="digital-time">--:--:--</div>
+        <div id="dateText" class="date-text"></div>
+        <div class="shichen-chip">
+          <span id="shichenName" class="shichen-name">--时</span>
+          <span id="shichenRange">--:--–--:--</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="choice-card" aria-labelledby="choiceTitle">
+      <h2 id="choiceTitle" class="choice-heading">是哪一边在跳？</h2>
+      <p class="choice-subtitle">点击对应眼睛，查看当前时辰的说法</p>
+
+      <div class="eye-buttons">
+        <button class="eye-button" type="button" data-side="left" aria-label="查看左眼当前时辰的说法">
+          <svg class="eye-icon" viewBox="0 0 64 40" fill="none" aria-hidden="true">
+            <path d="M4 20C11 9 20 4 32 4s21 5 28 16c-7 11-16 16-28 16S11 31 4 20Z" stroke="currentColor" stroke-width="3"/>
+            <circle cx="32" cy="20" r="8" fill="currentColor"/>
+            <circle cx="35" cy="17" r="2.5" fill="#fff" opacity="0.85"/>
+          </svg>
+          <span><strong>左眼</strong><small>查看此刻左眼</small></span>
+        </button>
+
+        <button class="eye-button" type="button" data-side="right" aria-label="查看右眼当前时辰的说法">
+          <svg class="eye-icon" viewBox="0 0 64 40" fill="none" aria-hidden="true">
+            <path d="M4 20C11 9 20 4 32 4s21 5 28 16c-7 11-16 16-28 16S11 31 4 20Z" stroke="currentColor" stroke-width="3"/>
+            <circle cx="32" cy="20" r="8" fill="currentColor"/>
+            <circle cx="35" cy="17" r="2.5" fill="#fff" opacity="0.85"/>
+          </svg>
+          <span><strong>右眼</strong><small>查看此刻右眼</small></span>
+        </button>
+      </div>
+
+      <p class="rule-note">本页采用《玉匣记》通行规则：只分左右眼与十二时辰，不区分上、下眼皮及男女。</p>
+    </section>
+
+    <footer>本页内容属于传统民俗参考，不构成事实预测或医疗建议。</footer>
+  </main>
+
+  <div id="resultModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="resultText" hidden>
+    <div class="result-panel">
+      <div class="result-topline">
+        <span id="resultMeta" class="result-meta">左眼 · 子时</span>
+        <button id="closeModal" class="close-button" type="button" aria-label="关闭结果">✕</button>
+      </div>
+
+      <div id="fortuneLabel" class="fortune-label good">吉象</div>
+      <h2 id="resultText" class="result-text good">有贵人</h2>
+      <p id="resultExplain" class="result-explain"></p>
+
+      <div id="remedy" class="remedy" hidden>
+        <h3 class="remedy-title">民俗“白跳”方法</h3>
+        <p>在对应眼皮上涂水，撕下一点白纸沾眼皮上，即是“白跳”。</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const shichen = [
+      {
+        name: "子时", branch: "子", range: "23:00–00:59",
+        left:  { text: "有贵人", good: true, detail: "按通行规则，此时左眼跳动，主有贵人。" },
+        right: { text: "有酒食、宴请", good: true, detail: "按通行规则，此时右眼跳动，主有酒食或宴请。" }
+      },
+      {
+        name: "丑时", branch: "丑", range: "01:00–02:59",
+        left:  { text: "有忧疑、烦心", good: false, detail: "按通行规则，此时左眼跳动，主有忧疑烦心之事。" },
+        right: { text: "有人悲伤", good: false, detail: "按通行规则，此时右眼跳动，主有人悲伤。" }
+      },
+      {
+        name: "寅时", branch: "寅", range: "03:00–04:59",
+        left:  { text: "远方之人来", good: true, detail: "按通行规则，此时左眼跳动，主远方之人到来。" },
+        right: { text: "有喜庆之事", good: true, detail: "按通行规则，此时右眼跳动，主有喜庆之事。" }
+      },
+      {
+        name: "卯时", branch: "卯", range: "05:00–06:59",
+        left:  { text: "贵人来", good: true, detail: "按通行规则，此时左眼跳动，主有贵人来。" },
+        right: { text: "平安吉利", good: true, detail: "按通行规则，此时右眼跳动，主平安吉利。" }
+      },
+      {
+        name: "辰时", branch: "辰", range: "07:00–08:59",
+        left:  { text: "有客人来", good: true, detail: "按通行规则，此时左眼跳动，主有客人到来。" },
+        right: { text: "有损害之事", good: false, detail: "按通行规则，此时右眼跳动，主有损害之事。" }
+      },
+      {
+        name: "巳时", branch: "巳", range: "09:00–10:59",
+        left:  { text: "有酒食", good: true, detail: "按通行规则，此时左眼跳动，主有酒食。" },
+        right: { text: "有凶事", good: false, detail: "按通行规则，此时右眼跳动，主有不利之事。" }
+      },
+      {
+        name: "午时", branch: "午", range: "11:00–12:59",
+        left:  { text: "有饮食、宴请", good: true, detail: "按通行规则，此时左眼跳动，主有饮食或宴请。" },
+        right: { text: "有凶事", good: false, detail: "按通行规则，此时右眼跳动，主有不利之事。" }
+      },
+      {
+        name: "未时", branch: "未", range: "13:00–14:59",
+        left:  { text: "吉祥昌盛", good: true, detail: "按通行规则，此时左眼跳动，主吉祥昌盛。" },
+        right: { text: "有小喜", good: true, detail: "按通行规则，此时右眼跳动，主有小喜。" }
+      },
+      {
+        name: "申时", branch: "申", range: "15:00–16:59",
+        left:  { text: "有财利", good: true, detail: "按通行规则，此时左眼跳动，主有财利。" },
+        right: { text: "有女子思念", good: true, detail: "按通行规则，此时右眼跳动，主有女子思念。" }
+      },
+      {
+        name: "酉时", branch: "酉", range: "17:00–18:59",
+        left:  { text: "有客人到", good: true, detail: "按通行规则，此时左眼跳动，主有客人到来。" },
+        right: { text: "有亲友来", good: true, detail: "按通行规则，此时右眼跳动，主有亲友来。" }
+      },
+      {
+        name: "戌时", branch: "戌", range: "19:00–20:59",
+        left:  { text: "有酒食", good: true, detail: "按通行规则，此时左眼跳动，主有酒食。" },
+        right: { text: "有聚财之象", good: true, detail: "按通行规则，此时右眼跳动，主有聚财之象。" }
+      },
+      {
+        name: "亥时", branch: "亥", range: "21:00–22:59",
+        left:  { text: "有客人来", good: true, detail: "按通行规则，此时左眼跳动，主有客人到来。" },
+        right: { text: "有官事或诉讼", good: false, detail: "按通行规则，此时右眼跳动，主有官事、公务或诉讼之事。" }
+      }
+    ];
+
+    const digitalTime = document.getElementById("digitalTime");
+    const dateText = document.getElementById("dateText");
+    const shichenName = document.getElementById("shichenName");
+    const shichenRange = document.getElementById("shichenRange");
+    const sundialShadow = document.getElementById("sundialShadow");
+    const currentArc = document.getElementById("currentArc");
+    const dialTicks = document.getElementById("dialTicks");
+    const dialLabels = document.getElementById("dialLabels");
+    const resultModal = document.getElementById("resultModal");
+    const resultMeta = document.getElementById("resultMeta");
+    const fortuneLabel = document.getElementById("fortuneLabel");
+    const resultText = document.getElementById("resultText");
+    const resultExplain = document.getElementById("resultExplain");
+    const remedy = document.getElementById("remedy");
+    const closeModalButton = document.getElementById("closeModal");
+
+    let activeIndex = -1;
+    let lastTrigger = null;
+
+    function getShichenIndex(date) {
+      const hour = date.getHours();
+      if (hour >= 23 || hour < 1) return 0;
+      return Math.floor((hour + 1) / 2);
+    }
+
+    function buildDial() {
+      const tickParts = [];
+      for (let i = 0; i < 48; i += 1) {
+        const angle = i * 7.5;
+        const isShichen = i % 4 === 0;
+        const isHour = i % 2 === 0;
+        const y1 = isShichen ? 30 : (isHour ? 34 : 37);
+        const y2 = isShichen ? 48 : (isHour ? 45 : 43);
+        tickParts.push(
+          `<line x1="210" y1="${y1}" x2="210" y2="${y2}" transform="rotate(${angle} 210 210)" ` +
+          `stroke="${isShichen ? "#655536" : "#887756"}" stroke-opacity="${isShichen ? "0.72" : "0.38"}" ` +
+          `stroke-width="${isShichen ? "2.2" : "1"}" stroke-linecap="round"/>`
+        );
+      }
+      dialTicks.innerHTML = tickParts.join("");
+
+      dialLabels.innerHTML = shichen.map((item, index) => {
+        const angle = (index * 30 + 15) * Math.PI / 180;
+        const radius = 146;
+        const x = 210 + Math.sin(angle) * radius;
+        const y = 210 - Math.cos(angle) * radius;
+        return `<text class="dial-label" data-index="${index}" x="${x.toFixed(2)}" y="${y.toFixed(2)}">${item.branch}</text>`;
+      }).join("");
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const index = getShichenIndex(now);
+      const item = shichen[index];
+
+      digitalTime.textContent = new Intl.DateTimeFormat("zh-CN", {
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+      }).format(now);
+
+      dateText.textContent = new Intl.DateTimeFormat("zh-CN", {
+        year: "numeric", month: "long", day: "numeric", weekday: "long"
+      }).format(now);
+
+      shichenName.textContent = item.name;
+      shichenRange.textContent = item.range;
+
+      const minutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+      const shiftedMinutes = (minutes - 23 * 60 + 1440) % 1440;
+      const shadowAngle = shiftedMinutes / 1440 * 360;
+      sundialShadow.setAttribute("transform", `rotate(${shadowAngle.toFixed(3)} 210 210)`);
+
+      if (index !== activeIndex) {
+        activeIndex = index;
+        currentArc.setAttribute("transform", `rotate(${index * 30 - 88} 210 210)`);
+        document.querySelectorAll(".dial-label").forEach((label) => {
+          label.classList.toggle("active", Number(label.dataset.index) === index);
+        });
+      }
+    }
+
+    function showResult(side) {
+      const now = new Date();
+      const item = shichen[getShichenIndex(now)];
+      const fortune = item[side];
+      const isGood = fortune.good;
+      const sideName = side === "left" ? "左眼" : "右眼";
+
+      resultMeta.textContent = `${sideName} · ${item.name} · ${item.range}`;
+      fortuneLabel.textContent = isGood ? "吉象" : "不利";
+      fortuneLabel.className = `fortune-label ${isGood ? "good" : "bad"}`;
+      resultText.textContent = fortune.text;
+      resultText.className = `result-text ${isGood ? "good" : "bad"}`;
+      resultExplain.textContent = fortune.detail;
+      remedy.hidden = isGood;
+
+      lastTrigger = document.activeElement;
+      resultModal.hidden = false;
+      document.body.classList.add("modal-open");
+      requestAnimationFrame(() => {
+        resultModal.classList.add("open");
+        closeModalButton.focus();
+      });
+    }
+
+    function closeResult() {
+      resultModal.classList.remove("open");
+      document.body.classList.remove("modal-open");
+      window.setTimeout(() => {
+        resultModal.hidden = true;
+        if (lastTrigger) lastTrigger.focus();
+      }, 180);
+    }
+
+    document.querySelectorAll(".eye-button").forEach((button) => {
+      button.addEventListener("click", () => showResult(button.dataset.side));
+    });
+
+    closeModalButton.addEventListener("click", closeResult);
+    resultModal.addEventListener("click", (event) => {
+      if (event.target === resultModal) closeResult();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !resultModal.hidden) closeResult();
+    });
+
+    buildDial();
+    updateClock();
+    window.setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>
